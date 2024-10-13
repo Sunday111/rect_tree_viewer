@@ -1,6 +1,6 @@
 #include "camera.hpp"
 
-namespace drect_tree_viewer
+namespace rect_tree_viewer
 {
 edt::FloatRange2Df Camera::ComputeRange(const edt::FloatRange2Df& world_range) const
 {
@@ -24,4 +24,4 @@ void Camera::Pan(const edt::Vec2f& delta)
     eye_ += delta;
 }
 
-}  // namespace drect_tree_viewer
+}  // namespace rect_tree_viewer

@@ -442,5 +442,5 @@ void Main()
 
 int main()
 {
-    klgl::ErrorHandling::InvokeAndCatchAll(dir_to_tree::Main);
+    klgl::ErrorHandling::InvokeAndCatchAll(rect_tree_viewer::Main);
 }
