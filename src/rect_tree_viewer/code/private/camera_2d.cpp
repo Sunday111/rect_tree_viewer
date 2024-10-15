@@ -1,4 +1,4 @@
-#include "camera.hpp"
+#include "camera_2d.hpp"
 
 namespace rect_tree_viewer
 {
@@ -12,11 +12,6 @@ edt::FloatRange2Df Camera::ComputeRange(const edt::FloatRange2Df& world_range) c
 void Camera::Update(const edt::FloatRange2Df& world_range)
 {
     range_ = ComputeRange(world_range);
-}
-
-void Camera::Zoom(const float delta)
-{
-    zoom_ += delta;
 }
 
 void Camera::Pan(const edt::Vec2f& delta)

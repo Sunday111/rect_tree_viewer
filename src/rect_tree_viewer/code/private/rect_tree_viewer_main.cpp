@@ -7,7 +7,7 @@
 #include <ranges>
 
 #include "EverydayTools/Math/FloatRange.hpp"
-#include "camera.hpp"
+#include "camera_2d.hpp"
 #include "fmt/std.h"  // IWYU pragma: keep
 #include "klgl/application.hpp"
 #include "klgl/error_handling.hpp"
@@ -20,6 +20,8 @@
 #include "klgl/rendering/painter2d.hpp"
 #include "klgl/window.hpp"
 #include "nlohmann/json.hpp"
+#include "read_directory_tree.hpp"
+#include "tree.hpp"
 
 namespace rect_tree_viewer
 {
@@ -27,95 +29,21 @@ namespace rect_tree_viewer
 namespace fs = std::filesystem;
 using namespace edt::lazy_matrix_aliases;  // NOLINT
 
-struct Node
+[[nodiscard]] static constexpr ImVec2 ToImVec(Vec2f v) noexcept
 {
-    std::string name;
-    long double value;
-    std::optional<size_t> parent{};
-    std::optional<size_t> first_child{};
-    std::optional<size_t> next_sibling{};
-
-    void GetChildren(std::span<const Node> nodes, std::vector<size_t>& out_children) const
-    {
-        std::optional<size_t> opt_child_id = first_child;
-        while (opt_child_id)
-        {
-            size_t child_id = opt_child_id.value();
-            out_children.push_back(child_id);
-            opt_child_id = nodes[child_id].next_sibling;
-        }
-    }
-};
-
-[[nodiscard]] std::vector<Node> MakeNodeGraph(const fs::path& root_path)
-{
-    struct WalkEntry
-    {
-        fs::directory_entry dir_entry;
-        size_t id;
-    };
-
-    std::vector<Node> nodes;
-
-    // Add the root node
-    nodes.push_back({
-        .name = root_path.stem().string(),
-        .value = 0,
-    });
-
-    std::vector<WalkEntry> walk_stack{
-        WalkEntry{.dir_entry = fs::directory_entry(root_path), .id = 0},
-    };
-
-    while (!walk_stack.empty())
-    {
-        auto walk_entry = std::move(walk_stack.back());
-        walk_stack.pop_back();
-
-        if (fs::is_regular_file(walk_entry.dir_entry))
-        {
-            Node& node = nodes[walk_entry.id];
-            node.value = static_cast<long double>(fs::file_size(walk_entry.dir_entry.path()));
-        }
-        else if (fs::is_directory(walk_entry.dir_entry))
-        {
-            for (const auto& child_dir_entry : fs::directory_iterator(walk_entry.dir_entry))
-            {
-                size_t child_id = nodes.size();
-                nodes.push_back({
-                    .name = child_dir_entry.path().stem().string(),
-                    .value = 0,
-                    .parent = walk_entry.id,
-                    .next_sibling = nodes[walk_entry.id].first_child,
-                });
-
-                nodes[walk_entry.id].first_child = child_id;
-
-                walk_stack.push_back({
-                    .dir_entry = child_dir_entry,
-                    .id = child_id,
-                });
-            }
-        }
-    }
-
-    // Propagate sizes from child to parent
-    for (Node& node : nodes | std::views::reverse | std::views::take(nodes.size() - 1))
-    {
-        [[likely]] if (node.parent)
-        {
-            nodes[*node.parent].value += node.value;
-        }
-    }
-
-    return nodes;
+    return ImVec2(v.x(), v.y());
 }
 
-void WriteNodesGraphToJSON(std::span<const Node> nodes, const fs::path& path)
+// [[nodiscard]] static constexpr Vec2f FromImVec(ImVec2 v) noexcept
+// {
+//     return {v.x, v.y};
+// }
+
+void WriteNodesGraphToJSON(std::span<const TreeNode> nodes, const fs::path& path)
 {
     nlohmann::json json;
     auto& nodes_json = json["nodes"];
-    for (const Node& node : nodes)
+    for (const TreeNode& node : nodes)
     {
         nlohmann::json& node_json = nodes_json.emplace_back(nlohmann::json::object());
         node_json["name"] = node.name;
@@ -171,8 +99,21 @@ class RectTreeViewerApp : public klgl::Application
         klgl::OpenGl::SetClearColor({});
         GetWindow().SetSize(1000, 1000);
         GetWindow().SetTitle("Painter 2d");
+        SetTargetFramerate(60.f);
         painter_ = std::make_unique<klgl::Painter2d>();
-        nodes_ = MakeNodeGraph(root_path_);
+
+        big_font_ = [&](float pixel_size)
+        {
+            ImGuiIO& io = ImGui::GetIO();
+            ImFontConfig config;
+            config.SizePixels = pixel_size;
+            config.OversampleH = config.OversampleV = 1;
+            config.PixelSnapH = true;
+            ImFont* font = io.Fonts->AddFontDefault(&config);
+            return font;
+        }(45);
+
+        nodes_ = ReadDirectoryTree(root_path_);
 
         constexpr float shrink_factor = 0.97f;
 
@@ -185,7 +126,7 @@ class RectTreeViewerApp : public klgl::Application
         {
             children_nodes.clear();
             regions.clear();
-            nodes_[node_id].GetChildren(nodes_, children_nodes);
+            TreeHelper::GetChildren(nodes_, node_id, children_nodes);
 
             if (children_nodes.empty())
             {
@@ -297,7 +238,10 @@ class RectTreeViewerApp : public klgl::Application
     {
         if (!ImGui::GetIO().WantCaptureMouse)
         {
-            camera_.Zoom(event.value.y() * camera_.zoom_speed);
+            zoom_power_ += event.value.y();
+            float zoom = std::powf(1.1f, zoom_power_);
+            zoom = std::max(zoom, 0.1f);
+            camera_.SetZoom(zoom);
         }
     }
 
@@ -352,7 +296,7 @@ class RectTreeViewerApp : public klgl::Application
         while (true)
         {
             children.clear();
-            nodes_[parent].GetChildren(nodes_, children);
+            TreeHelper::GetChildren(nodes_, parent, children);
 
             bool found_child = false;
             for (size_t child : children)
@@ -392,6 +336,52 @@ class RectTreeViewerApp : public klgl::Application
         return path;
     }
 
+    std::tuple<long double, std::string_view> PickSizeUnit(long double size)
+    {
+        if (auto value = (size / 1'000'000'000'000'000); value > 1.001) return {value, "PB"};
+        if (auto value = (size / 1'000'000'000'000); value > 1.001) return {value, "TB"};
+        if (auto value = (size / 1'000'000'000); value > 1.001) return {value, "GB"};
+        if (auto value = (size / 1'000'000); value > 1.001) return {value, "MB"};
+        if (auto value = (size / 1'000); value > 1.001) return {value, "kB"};
+        return {size, "b"};
+    }
+
+    void DrawGUI()
+    {
+        const Vec2f window_padding{10, 10};
+
+        ImGui::PushFont(big_font_);
+        ImGui::PushStyleVar(ImGuiStyleVar_WindowBorderSize, 0.0f);
+        ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ToImVec(window_padding));
+
+        const Vec2f root_window_size = GetWindow().GetSize2f();
+        const Vec2f panel_size = root_window_size * Vec2f{1.f, 0.15f};
+        const Vec2f panel_position{0, root_window_size.y() - panel_size.y()};
+
+        constexpr int flags = ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoMove |
+                              ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollWithMouse |
+                              ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoSavedSettings;
+
+        ImGui::SetNextWindowPos(ToImVec(panel_position));
+        ImGui::SetNextWindowSize(ToImVec(panel_size));
+
+        if (ImGui::Begin("Counter", nullptr, flags))
+        {
+            ImGuiText("Root: {}", root_path_);
+            if (auto opt_node_id = FindNodeAt(GetMousePositionInWorldCoordinates()))
+            {
+                ImGuiText("Cursor: {}", GetNodeFullPath(*opt_node_id));
+
+                const auto [value, unit] = PickSizeUnit(nodes_[*opt_node_id].value);
+                ImGuiText("  Size: {} {}", value, unit);
+            }
+            ImGui::End();
+        }
+
+        ImGui::PopStyleVar(2);
+        ImGui::PopFont();
+    }
+
     void Tick() override
     {
         UpdateCamera();
@@ -406,27 +396,44 @@ class RectTreeViewerApp : public klgl::Application
             painter_->DrawRect(rects_[i].ToPainterRect(colors_[i]));
         }
 
-        auto mouse_pos = GetMousePositionInWorldCoordinates();
-        if (auto opt_node_id = FindNodeAt(mouse_pos))
-        {
-            std::string path = GetNodeFullPath(*opt_node_id);
-            ImGui::Text("%s: %zu", path.data(), static_cast<size_t>(nodes_[*opt_node_id].value));  // NOLINT
-        }
-
         painter_->EndDraw();
+
+        DrawGUI();
+    }
+
+    template <typename... Args>
+    constexpr static void FormatToBuffer(std::string& buffer, fmt::format_string<Args...> format_string, Args&&... args)
+    {
+        fmt::format_to(std::back_inserter(buffer), format_string, std::forward<Args>(args)...);
+    }
+
+    template <typename... Args>
+    void ImGuiText(fmt::format_string<Args...> format_string, Args&&... args)
+    {
+        text_buffer_.clear();
+        FormatToBuffer(text_buffer_, format_string, std::forward<Args>(args)...);
+        const char* begin = text_buffer_.data();
+        const char* end = begin + text_buffer_.size();  // NOLINT
+        ImGui::TextUnformatted(begin, end);
     }
 
     static constexpr auto kWorldRange = edt::FloatRange2Df::FromMinMax(Vec2f{} - 1, Vec2f{} + 1);
     static constexpr auto kViewRange = edt::FloatRange2Df::FromMinMax(Vec2f{} - 1, Vec2f{} + 1);
 
-    std::vector<Node> nodes_;
+    ImFont* big_font_ = nullptr;
+
+    std::string text_buffer_;
+
+    std::vector<TreeNode> nodes_;
     std::vector<Rect2d> rects_;
     std::vector<Vec4u8> colors_;
     std::unique_ptr<klgl::Painter2d> painter_;
-    fs::path root_path_ = fs::path("C:/data/projects");
+    fs::path root_path_ = fs::path("C:/data/projects/verlet");
 
     Mat3f world_to_camera_;
     Mat3f world_to_view_;
+
+    float zoom_power_ = 0.f;
 
     Mat3f screen_to_world_;
     Camera camera_;

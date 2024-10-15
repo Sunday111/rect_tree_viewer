@@ -12,12 +12,11 @@ public:
     [[nodiscard]] float GetZoom() const { return zoom_; }
     [[nodiscard]] const edt::Vec2f& GetEye() const { return eye_; }
 
-    void Zoom(const float delta);
+    void SetZoom(float zoom) { zoom_ = zoom; }
     void Pan(const edt::Vec2f& delta);
 
     void Update(const edt::FloatRange2Df& world_range);
 
-    float zoom_speed = 0.2f;
     float zoom_animation_diration_seconds = 0.3f;
     float pan_speed = 0.3f;
     float pan_animation_diration_seconds = 0.3f;
