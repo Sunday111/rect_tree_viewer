@@ -1,6 +1,5 @@
 {
-    "name": "Cuda",
-    "modules_dir": "src",
+    "name": "RectTreeViewer",
     "cloned_dependencies_dir": "cloned_dependencies",
     "enable_lto_globally": true,
     "cpp": {
