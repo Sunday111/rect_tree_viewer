@@ -8,7 +8,7 @@
             "args": [
                 "${workspaceFolder}/yae/scripts/make_project_files.py",
                 "--project_dir=${workspaceFolder}",
-                "--external_modules_dir=C:/data/projects/yae_external_modules"
+                // "--external_modules_dir=C:/data/projects/yae_external_modules"
             ],
             "problemMatcher": []
         },
@@ -28,7 +28,7 @@
             "args": [
                 "${workspaceFolder}/yae/scripts/modules_git_status.py",
                 "--project_dir=${workspaceFolder}",
-                "--external_modules_dir=C:/data/projects/yae_external_modules"
+                // "--external_modules_dir=C:/data/projects/yae_external_modules"
             ],
             "problemMatcher": []
         },

@@ -2,6 +2,7 @@
 
 #include <EverydayTools/Math/Math.hpp>
 #include <filesystem>
+#include <klgl/ui/simple_type_widget.hpp>
 #include <optional>
 #include <random>
 #include <ranges>
@@ -34,10 +35,10 @@ using namespace edt::lazy_matrix_aliases;  // NOLINT
     return ImVec2(v.x(), v.y());
 }
 
-// [[nodiscard]] static constexpr Vec2f FromImVec(ImVec2 v) noexcept
-// {
-//     return {v.x, v.y};
-// }
+[[nodiscard]] static constexpr Vec2f FromImVec(ImVec2 v) noexcept
+{
+    return {v.x, v.y};
+}
 
 void WriteNodesGraphToJSON(std::span<const TreeNode> nodes, const fs::path& path)
 {
@@ -85,6 +86,34 @@ struct Region
     Rect2d rect;
     std::span<const size_t> nodes;
     long double value = 0;
+};
+
+class Viewport
+{
+public:
+    constexpr void FullWindow(const Vec2f& window_size) { range = edt::FloatRange2Df::FromMinMax({}, window_size); }
+    [[nodiscard]] constexpr float GetAspect() const
+    {
+        auto extent = range.Extent();
+        return extent.x() / extent.y();
+    }
+
+    void UseInOpenGL()
+    {
+        auto extent = range.Extent();
+        glViewport(
+            static_cast<GLint>(range.x.begin),
+            static_cast<GLint>(range.y.begin),
+            static_cast<GLint>(extent.x()),
+            static_cast<GLint>(extent.y()));
+    }
+
+    [[nodiscard]] constexpr Vec2f ScreenToView(const Vec2f p) const
+    {
+        return (2 * (p - range.Min()) / range.Extent()) - 1;
+    }
+
+    edt::FloatRange2Df range;
 };
 
 class RectTreeViewerApp : public klgl::Application
@@ -247,7 +276,9 @@ class RectTreeViewerApp : public klgl::Application
 
     void UpdateCamera()
     {
-        camera_.Update(kWorldRange);
+        if (!with_custom_viewport_) viewport_.FullWindow(GetWindow().GetSize2f());
+        camera_.Update(viewport_.GetAspect());
+        viewport_.UseInOpenGL();
 
         if (!ImGui::GetIO().WantCaptureKeyboard)
         {
@@ -257,33 +288,20 @@ class RectTreeViewerApp : public klgl::Application
             if (ImGui::IsKeyDown(ImGuiKey_D)) offset.x() += 1.f;
             if (ImGui::IsKeyDown(ImGuiKey_A)) offset.x() -= 1.f;
 
-            camera_.Pan((GetLastFrameDurationSeconds() * camera_.GetRange().Extent() * offset) * camera_.pan_speed);
+            Vec2f eye = camera_.GetEye();
+            constexpr float pan_speed = 0.2f;
+            eye += (GetLastFrameDurationSeconds() * offset) * pan_speed;
+            camera_.SetEye(eye);
         }
-    }
-
-    void UpdateRenderTransforms()
-    {
-        const auto screen_range = edt::FloatRange2Df::FromMinMax({}, GetWindow().GetSize2f());
-        const auto camera_to_world_vector = kWorldRange.Uniform(.5f) - camera_.GetEye();
-        const auto camera_extent = camera_.GetRange().Extent();
-
-        world_to_camera_ = edt::Math::TranslationMatrix(camera_to_world_vector);
-        auto camera_to_view_ = edt::Math::ScaleMatrix(kViewRange.Extent() / camera_extent);
-        world_to_view_ = camera_to_view_.MatMul(world_to_camera_);
-
-        const auto screen_to_view =
-            edt::Math::TranslationMatrix(Vec2f{} - 1).MatMul(edt::Math::ScaleMatrix(2 / screen_range.Extent()));
-        const auto view_to_camera = edt::Math::ScaleMatrix(camera_extent / kViewRange.Extent());
-        const auto camera_to_world = edt::Math::TranslationMatrix(-camera_to_world_vector);
-        screen_to_world_ = camera_to_world.MatMul(view_to_camera).MatMul(screen_to_view);
     }
 
     Vec2f GetMousePositionInWorldCoordinates() const
     {
-        const auto screen_range = edt::FloatRange2Df::FromMinMax({}, GetWindow().GetSize2f());  // 0 -> resolution
-        auto [x, y] = ImGui::GetMousePos();
-        y = screen_range.y.Extent() - y;
-        return edt::Math::TransformPos(screen_to_world_, Vec2f{x, y});
+        const auto screen_size = GetWindow().GetSize2f();
+        Vec2f p = FromImVec(ImGui::GetMousePos());
+        p.y() = screen_size.y() - p.y();
+        p = viewport_.ScreenToView(p);
+        return edt::Math::TransformPos(camera_.ViewToWorld(), p);
     }
 
     std::optional<size_t> FindNodeAt(const Vec2f& position) const
@@ -380,16 +398,31 @@ class RectTreeViewerApp : public klgl::Application
 
         ImGui::PopStyleVar(2);
         ImGui::PopFont();
+
+        if (ImGui::Begin("Viewport"))
+        {
+            ImGui::Checkbox("Custom", &with_custom_viewport_);
+            if (with_custom_viewport_)
+            {
+                Vec2f min = viewport_.range.Min();
+                klgl::SimpleTypeWidget("Min", min);
+
+                Vec2f max = viewport_.range.Max();
+                klgl::SimpleTypeWidget("Max", max);
+
+                viewport_.range = edt::FloatRange2Df::FromMinMax(min, max);
+            }
+            ImGui::End();
+        }
     }
 
     void Tick() override
     {
         UpdateCamera();
-        UpdateRenderTransforms();
 
         painter_->BeginDraw();
 
-        painter_->SetViewMatrix(world_to_view_.Transposed());
+        painter_->SetViewMatrix(camera_.WorldToView().Transposed());
 
         for (const size_t i : std::views::iota(size_t{0}, nodes_.size()))
         {
@@ -417,9 +450,6 @@ class RectTreeViewerApp : public klgl::Application
         ImGui::TextUnformatted(begin, end);
     }
 
-    static constexpr auto kWorldRange = edt::FloatRange2Df::FromMinMax(Vec2f{} - 1, Vec2f{} + 1);
-    static constexpr auto kViewRange = edt::FloatRange2Df::FromMinMax(Vec2f{} - 1, Vec2f{} + 1);
-
     ImFont* big_font_ = nullptr;
 
     std::string text_buffer_;
@@ -430,14 +460,13 @@ class RectTreeViewerApp : public klgl::Application
     std::unique_ptr<klgl::Painter2d> painter_;
     fs::path root_path_ = fs::path("C:/data/projects/verlet");
 
-    Mat3f world_to_camera_;
-    Mat3f world_to_view_;
-
     float zoom_power_ = 0.f;
 
-    Mat3f screen_to_world_;
-    Camera camera_;
+    Camera2d camera_;
     std::unique_ptr<klgl::events::IEventListener> event_listener_;
+
+    Viewport viewport_{};
+    bool with_custom_viewport_ = false;
 };
 
 void Main()

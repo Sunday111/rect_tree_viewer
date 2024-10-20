@@ -6,8 +6,7 @@
     // CMake
     "cmake.generator": "Ninja",
     "cmake.configureArgs": [
-        "-DOpenCV_DIR:PATH=C:/data/soft/portable/opencv/install",
-        "-DYAE_EXTERNAL_MODULES_DIR=C:/data/projects/yae_external_modules"
+        // "-DYAE_EXTERNAL_MODULES_DIR=C:/data/projects/yae_external_modules"
     ],
     
     // Python
