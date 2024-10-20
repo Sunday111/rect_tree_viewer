@@ -7,10 +7,9 @@
 #include <random>
 #include <ranges>
 
-#include "EverydayTools/Math/FloatRange.hpp"
-#include "camera_2d.hpp"
 #include "fmt/std.h"  // IWYU pragma: keep
 #include "klgl/application.hpp"
+#include "klgl/camera/camera_2d.hpp"
 #include "klgl/error_handling.hpp"
 #include "klgl/events/event_listener_interface.hpp"
 #include "klgl/events/event_listener_method.hpp"
@@ -18,11 +17,13 @@
 #include "klgl/events/mouse_events.hpp"
 #include "klgl/filesystem/filesystem.hpp"
 #include "klgl/opengl/gl_api.hpp"
+#include "klgl/reflection/matrix_reflect.hpp"  // IWYU pragma: keep
 #include "klgl/rendering/painter2d.hpp"
 #include "klgl/window.hpp"
 #include "nlohmann/json.hpp"
 #include "read_directory_tree.hpp"
 #include "tree.hpp"
+
 
 namespace rect_tree_viewer
 {
@@ -88,36 +89,10 @@ struct Region
     long double value = 0;
 };
 
-class Viewport
-{
-public:
-    constexpr void FullWindow(const Vec2f& window_size) { range = edt::FloatRange2Df::FromMinMax({}, window_size); }
-    [[nodiscard]] constexpr float GetAspect() const
-    {
-        auto extent = range.Extent();
-        return extent.x() / extent.y();
-    }
-
-    void UseInOpenGL()
-    {
-        auto extent = range.Extent();
-        glViewport(
-            static_cast<GLint>(range.x.begin),
-            static_cast<GLint>(range.y.begin),
-            static_cast<GLint>(extent.x()),
-            static_cast<GLint>(extent.y()));
-    }
-
-    [[nodiscard]] constexpr Vec2f ScreenToView(const Vec2f p) const
-    {
-        return (2 * (p - range.Min()) / range.Extent()) - 1;
-    }
-
-    edt::FloatRange2Df range;
-};
-
 class RectTreeViewerApp : public klgl::Application
 {
+    static constexpr auto kAspectRatioPolicy = klgl::AspectRatioPolicy::Stretch;
+
     void Initialize() override
     {
         event_listener_ =
@@ -268,17 +243,16 @@ class RectTreeViewerApp : public klgl::Application
         if (!ImGui::GetIO().WantCaptureMouse)
         {
             zoom_power_ += event.value.y();
-            float zoom = std::powf(1.1f, zoom_power_);
-            zoom = std::max(zoom, 0.1f);
-            camera_.SetZoom(zoom);
+            camera_.zoom = std::max(std::powf(1.1f, zoom_power_), 0.1f);
         }
     }
 
     void UpdateCamera()
     {
-        if (!with_custom_viewport_) viewport_.FullWindow(GetWindow().GetSize2f());
-        camera_.Update(viewport_.GetAspect());
+        if (!with_custom_viewport_) viewport_.MatchWindowSize(GetWindow().GetSize2f());
         viewport_.UseInOpenGL();
+
+        transforms_.Update(camera_, viewport_, kAspectRatioPolicy);
 
         if (!ImGui::GetIO().WantCaptureKeyboard)
         {
@@ -288,10 +262,8 @@ class RectTreeViewerApp : public klgl::Application
             if (ImGui::IsKeyDown(ImGuiKey_D)) offset.x() += 1.f;
             if (ImGui::IsKeyDown(ImGuiKey_A)) offset.x() -= 1.f;
 
-            Vec2f eye = camera_.GetEye();
             constexpr float pan_speed = 0.2f;
-            eye += (GetLastFrameDurationSeconds() * offset) * pan_speed;
-            camera_.SetEye(eye);
+            camera_.eye += (GetLastFrameDurationSeconds() * offset) * pan_speed;
         }
     }
 
@@ -300,8 +272,7 @@ class RectTreeViewerApp : public klgl::Application
         const auto screen_size = GetWindow().GetSize2f();
         Vec2f p = FromImVec(ImGui::GetMousePos());
         p.y() = screen_size.y() - p.y();
-        p = viewport_.ScreenToView(p);
-        return edt::Math::TransformPos(camera_.ViewToWorld(), p);
+        return edt::Math::TransformPos(transforms_.screen_to_world, p);
     }
 
     std::optional<size_t> FindNodeAt(const Vec2f& position) const
@@ -366,54 +337,65 @@ class RectTreeViewerApp : public klgl::Application
 
     void DrawGUI()
     {
-        const Vec2f window_padding{10, 10};
-
-        ImGui::PushFont(big_font_);
-        ImGui::PushStyleVar(ImGuiStyleVar_WindowBorderSize, 0.0f);
-        ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ToImVec(window_padding));
-
-        const Vec2f root_window_size = GetWindow().GetSize2f();
-        const Vec2f panel_size = root_window_size * Vec2f{1.f, 0.15f};
-        const Vec2f panel_position{0, root_window_size.y() - panel_size.y()};
-
-        constexpr int flags = ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoMove |
-                              ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollWithMouse |
-                              ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoSavedSettings;
-
-        ImGui::SetNextWindowPos(ToImVec(panel_position));
-        ImGui::SetNextWindowSize(ToImVec(panel_size));
-
-        if (ImGui::Begin("Counter", nullptr, flags))
         {
-            ImGuiText("Root: {}", root_path_);
-            if (auto opt_node_id = FindNodeAt(GetMousePositionInWorldCoordinates()))
-            {
-                ImGuiText("Cursor: {}", GetNodeFullPath(*opt_node_id));
+            const Vec2f window_padding{10, 10};
 
-                const auto [value, unit] = PickSizeUnit(nodes_[*opt_node_id].value);
-                ImGuiText("  Size: {} {}", value, unit);
+            ImGui::PushFont(big_font_);
+            ImGui::PushStyleVar(ImGuiStyleVar_WindowBorderSize, 0.0f);
+            ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ToImVec(window_padding));
+
+            const Vec2f root_window_size = GetWindow().GetSize2f();
+            const Vec2f panel_size = root_window_size * Vec2f{1.f, 0.15f};
+            const Vec2f panel_position{0, root_window_size.y() - panel_size.y()};
+
+            constexpr int flags = ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoMove |
+                                  ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollWithMouse |
+                                  ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoSavedSettings;
+
+            ImGui::SetNextWindowPos(ToImVec(panel_position));
+            ImGui::SetNextWindowSize(ToImVec(panel_size));
+
+            if (ImGui::Begin("Counter", nullptr, flags))
+            {
+                ImGuiText("Root: {}", root_path_);
+                if (auto opt_node_id = FindNodeAt(GetMousePositionInWorldCoordinates()))
+                {
+                    ImGuiText("Cursor: {}", GetNodeFullPath(*opt_node_id));
+
+                    const auto [value, unit] = PickSizeUnit(nodes_[*opt_node_id].value);
+                    ImGuiText("  Size: {} {}", value, unit);
+                }
+                ImGui::End();
             }
-            ImGui::End();
+
+            ImGui::PopStyleVar(2);
+            ImGui::PopFont();
         }
 
-        ImGui::PopStyleVar(2);
-        ImGui::PopFont();
+        // if (ImGui::Begin("Window"))
+        // {
+        //     const Vec2f window_size = GetWindow().GetSize2f();
+        //     ImGuiText("Size: {}x{}", window_size.x(), window_size.y());
+        //     ImGuiText("Aspect: {}", window_size.x() / window_size.y());
 
-        if (ImGui::Begin("Viewport"))
-        {
-            ImGui::Checkbox("Custom", &with_custom_viewport_);
-            if (with_custom_viewport_)
-            {
-                Vec2f min = viewport_.range.Min();
-                klgl::SimpleTypeWidget("Min", min);
+        //     if (ImGui::CollapsingHeader("Viewport"))
+        //     {
+        //         ImGui::Checkbox("Custom", &with_custom_viewport_);
+        //         if (with_custom_viewport_)
+        //         {
+        //             klgl::SimpleTypeWidget("Position", viewport_.position);
+        //             klgl::SimpleTypeWidget("Size", viewport_.size);
+        //         }
+        //         else
+        //         {
+        //             ImGuiText("Position: {}x{}", viewport_.position.x(), viewport_.position.y());
+        //             ImGuiText("Size: {}x{}", viewport_.size.x(), viewport_.size.y());
+        //         }
 
-                Vec2f max = viewport_.range.Max();
-                klgl::SimpleTypeWidget("Max", max);
-
-                viewport_.range = edt::FloatRange2Df::FromMinMax(min, max);
-            }
-            ImGui::End();
-        }
+        //         ImGuiText("Aspect: {}", viewport_.GetAspect());
+        //     }
+        //     ImGui::End();
+        // }
     }
 
     void Tick() override
@@ -422,7 +404,7 @@ class RectTreeViewerApp : public klgl::Application
 
         painter_->BeginDraw();
 
-        painter_->SetViewMatrix(camera_.WorldToView().Transposed());
+        painter_->SetViewMatrix(transforms_.world_to_view.Transposed());
 
         for (const size_t i : std::views::iota(size_t{0}, nodes_.size()))
         {
@@ -450,6 +432,7 @@ class RectTreeViewerApp : public klgl::Application
         ImGui::TextUnformatted(begin, end);
     }
 
+    std::unique_ptr<klgl::events::IEventListener> event_listener_;
     ImFont* big_font_ = nullptr;
 
     std::string text_buffer_;
@@ -462,10 +445,9 @@ class RectTreeViewerApp : public klgl::Application
 
     float zoom_power_ = 0.f;
 
-    Camera2d camera_;
-    std::unique_ptr<klgl::events::IEventListener> event_listener_;
-
-    Viewport viewport_{};
+    klgl::Camera2d camera_;
+    klgl::Viewport viewport_;
+    klgl::RenderTransforms2d transforms_;
     bool with_custom_viewport_ = false;
 };
 

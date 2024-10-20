@@ -1,7 +1,6 @@
 cmake_minimum_required(VERSION 3.20)
 include(set_compiler_options)
 set(module_source_files
-    ${CMAKE_CURRENT_SOURCE_DIR}/code/private/camera_2d.hpp
     ${CMAKE_CURRENT_SOURCE_DIR}/code/private/read_directory_tree.hpp
     ${CMAKE_CURRENT_SOURCE_DIR}/code/private/rect_tree_viewer_main.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/code/private/tree.hpp)
