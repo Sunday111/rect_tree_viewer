@@ -21,9 +21,9 @@
 #include "klgl/rendering/painter2d.hpp"
 #include "klgl/window.hpp"
 #include "nlohmann/json.hpp"
+#include "open_file_dialog.hpp"
 #include "read_directory_tree.hpp"
 #include "tree.hpp"
-
 
 namespace rect_tree_viewer
 {
@@ -116,6 +116,10 @@ class RectTreeViewerApp : public klgl::Application
             ImFont* font = io.Fonts->AddFontDefault(&config);
             return font;
         }(45);
+
+        std::vector<std::filesystem::path> paths = OpenFileDialog({.multiselect = false, .pick_folders = true});
+        klgl::ErrorHandling::Ensure(paths.size() == 1, "Expect 1 path selected but got {}", paths.size());
+        root_path_ = paths.front();
 
         nodes_ = ReadDirectoryTree(root_path_);
 
@@ -441,7 +445,7 @@ class RectTreeViewerApp : public klgl::Application
     std::vector<Rect2d> rects_;
     std::vector<Vec4u8> colors_;
     std::unique_ptr<klgl::Painter2d> painter_;
-    fs::path root_path_ = fs::path("C:/data/projects/verlet");
+    fs::path root_path_;
 
     float zoom_power_ = 0.f;
 
