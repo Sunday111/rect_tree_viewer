@@ -21,9 +21,12 @@
 #include "klgl/rendering/painter2d.hpp"
 #include "klgl/window.hpp"
 #include "nlohmann/json.hpp"
-#include "open_file_dialog.hpp"
 #include "read_directory_tree.hpp"
 #include "tree.hpp"
+
+#ifdef _WIN32
+#include "open_file_dialog.hpp"
+#endif
 
 namespace rect_tree_viewer
 {
@@ -91,7 +94,10 @@ struct Region
 
 class RectTreeViewerApp : public klgl::Application
 {
+public:
     static constexpr auto kAspectRatioPolicy = klgl::AspectRatioPolicy::Stretch;
+
+    explicit RectTreeViewerApp(const fs::path& path) : klgl::Application(), root_path_(path) {}
 
     void Initialize() override
     {
@@ -116,10 +122,6 @@ class RectTreeViewerApp : public klgl::Application
             ImFont* font = io.Fonts->AddFontDefault(&config);
             return font;
         }(45);
-
-        std::vector<std::filesystem::path> paths = OpenFileDialog({.multiselect = false, .pick_folders = true});
-        klgl::ErrorHandling::Ensure(paths.size() == 1, "Expect 1 path selected but got {}", paths.size());
-        root_path_ = paths.front();
 
         nodes_ = ReadDirectoryTree(root_path_);
 
@@ -167,7 +169,7 @@ class RectTreeViewerApp : public klgl::Application
 
                 size_t first_region_size = 1;
                 long double first_region_value = nodes_[region_to_split.nodes.front()].value;
-                while (first_region_value * 2.02 < region_to_split.value)
+                while (first_region_value * 2.02L < region_to_split.value)
                 {
                     size_t child_id = region_to_split.nodes[first_region_size];
                     first_region_value += nodes_[child_id].value;
@@ -190,7 +192,7 @@ class RectTreeViewerApp : public klgl::Application
                     // split along X
                     const auto& r = region_to_split.rect;
                     // left rect
-                    float left_width = static_cast<float>(r.size.x() * split_ratio);
+                    float left_width = static_cast<float>(static_cast<long double>(r.size.x()) * split_ratio);
                     first_region.rect = {
                         .bottom_left = r.bottom_left,
                         .size = {left_width, r.size.y()},
@@ -206,7 +208,7 @@ class RectTreeViewerApp : public klgl::Application
                     // split along Y
                     const auto& r = region_to_split.rect;
                     // bottom rect
-                    float bottom_height = static_cast<float>(r.size.y() * split_ratio);
+                    float bottom_height = static_cast<float>(static_cast<long double>(r.size.y()) * split_ratio);
                     first_region.rect = {
                         .bottom_left = r.bottom_left,
                         .size = {r.size.x(), bottom_height},
@@ -247,7 +249,7 @@ class RectTreeViewerApp : public klgl::Application
         if (!ImGui::GetIO().WantCaptureMouse)
         {
             zoom_power_ += event.value.y();
-            camera_.zoom = std::max(std::powf(1.1f, zoom_power_), 0.1f);
+            camera_.zoom = std::max(std::pow(1.1f, zoom_power_), 0.1f);
         }
     }
 
@@ -331,11 +333,11 @@ class RectTreeViewerApp : public klgl::Application
 
     std::tuple<long double, std::string_view> PickSizeUnit(long double size)
     {
-        if (auto value = (size / 1'000'000'000'000'000); value > 1.001) return {value, "PB"};
-        if (auto value = (size / 1'000'000'000'000); value > 1.001) return {value, "TB"};
-        if (auto value = (size / 1'000'000'000); value > 1.001) return {value, "GB"};
-        if (auto value = (size / 1'000'000); value > 1.001) return {value, "MB"};
-        if (auto value = (size / 1'000); value > 1.001) return {value, "kB"};
+        if (auto value = (size / 1'000'000'000'000'000); value > 1.001L) return {value, "PB"};
+        if (auto value = (size / 1'000'000'000'000); value > 1.001L) return {value, "TB"};
+        if (auto value = (size / 1'000'000'000); value > 1.001L) return {value, "GB"};
+        if (auto value = (size / 1'000'000); value > 1.001L) return {value, "MB"};
+        if (auto value = (size / 1'000); value > 1.001L) return {value, "kB"};
         return {size, "b"};
     }
 
@@ -455,14 +457,30 @@ class RectTreeViewerApp : public klgl::Application
     bool with_custom_viewport_ = false;
 };
 
-void Main()
+fs::path GetPath(int argc, char** argv)
 {
-    RectTreeViewerApp app;
-    app.Run();
+    if (argc < 2)
+    {
+#ifdef _WIN32
+        std::vector<fs::path> paths = OpenFileDialog({.multiselect = false, .pick_folders = true});
+        klgl::ErrorHandling::Ensure(paths.size() == 1, "Expect 1 path selected but got {}", paths.size());
+        return paths.front();
+#else
+        throw klgl::ErrorHandling::RuntimeErrorWithMessage("Expected at least one path");
+#endif
+    }
+
+    return fs::path(argv[1]);  // NOLINT
 }
+
 }  // namespace rect_tree_viewer
 
-int main()
+int main(int argc, char** argv)
 {
-    klgl::ErrorHandling::InvokeAndCatchAll(rect_tree_viewer::Main);
+    klgl::ErrorHandling::InvokeAndCatchAll(
+        [&]
+        {
+            rect_tree_viewer::RectTreeViewerApp app(rect_tree_viewer::GetPath(argc, argv));
+            app.Run();
+        });
 }
