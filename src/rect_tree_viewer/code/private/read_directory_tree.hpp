@@ -1,29 +1,62 @@
 #include <filesystem>
 #include <ranges>
+#include <unordered_map>
 
 #include "tree.hpp"
 
-[[nodiscard]] std::vector<TreeNode> ReadDirectoryTree(const std::filesystem::path& root_path)
+struct ReadDirTreeEntry
+{
+    std::filesystem::directory_entry dir_entry;
+    size_t id;
+};
+
+std::vector<TreeNode> ReadDirectoryTreeMulti(
+    std::optional<std::string_view> root_node_name,
+    std::span<const std::filesystem::path> paths,
+    std::unordered_map<size_t, size_t>* out_root_node_id_to_path_index)
 {
     namespace fs = std::filesystem;
-
-    struct WalkEntry
-    {
-        fs::directory_entry dir_entry;
-        size_t id;
-    };
-
     std::vector<TreeNode> nodes;
+    std::vector<ReadDirTreeEntry> walk_stack;
 
-    // Add the root node
-    nodes.push_back({
-        .name = root_path.stem().string(),
-        .value = 0,
-    });
+    std::optional<size_t> common_root_id;
+    if (root_node_name)
+    {
+        // Add the root node
+        common_root_id = nodes.size();
+        nodes.push_back({
+            .name = std::string{*root_node_name},
+            .value = 0,
+        });
+    }
 
-    std::vector<WalkEntry> walk_stack{
-        WalkEntry{.dir_entry = fs::directory_entry(root_path), .id = 0},
-    };
+    // Add root paths
+    for (const size_t i : std::views::iota(size_t{0}, paths.size()))
+    {
+        const auto& path = paths[i];
+        size_t node_id = nodes.size();
+        nodes.push_back({
+            .name = path.stem().string(),
+            .value = 0,
+            .parent = common_root_id,
+        });
+
+        walk_stack.push_back({
+            .dir_entry = fs::directory_entry(path),
+            .id = node_id,
+        });
+
+        if (common_root_id)
+        {
+            nodes[node_id].next_sibling = nodes.front().first_child;
+            nodes.front().first_child = node_id;
+        }
+
+        if (out_root_node_id_to_path_index)
+        {
+            (*out_root_node_id_to_path_index)[node_id] = i;
+        }
+    }
 
     while (!walk_stack.empty())
     {
@@ -59,7 +92,7 @@
     }
 
     // Propagate sizes from child to parent
-    for (TreeNode& node : nodes | std::views::reverse | std::views::take(nodes.size() - 1))
+    for (TreeNode& node : nodes | std::views::reverse)
     {
         [[likely]] if (node.parent)
         {
@@ -68,4 +101,9 @@
     }
 
     return nodes;
+}
+
+std::vector<TreeNode> ReadDirectoryTree(const std::filesystem::path& root_path)
+{
+    return ReadDirectoryTreeMulti(std::nullopt, std::span{&root_path, 1}, nullptr);
 }

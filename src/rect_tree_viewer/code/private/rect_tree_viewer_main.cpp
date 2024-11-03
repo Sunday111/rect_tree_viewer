@@ -97,7 +97,10 @@ class RectTreeViewerApp : public klgl::Application
 public:
     static constexpr auto kAspectRatioPolicy = klgl::AspectRatioPolicy::Stretch;
 
-    explicit RectTreeViewerApp(const fs::path& path) : klgl::Application(), root_path_(path) {}
+    explicit RectTreeViewerApp(std::vector<fs::path> paths) : klgl::Application(), root_paths_(std::move(paths))
+    {
+        klgl::ErrorHandling::Ensure(!root_paths_.empty(), "Expected at least one path");
+    }
 
     void Initialize() override
     {
@@ -123,7 +126,14 @@ public:
             return font;
         }(45);
 
-        nodes_ = ReadDirectoryTree(root_path_);
+        if (root_paths_.size() == 1)
+        {
+            nodes_ = ReadDirectoryTreeMulti(std::nullopt, root_paths_, &root_node_id_to_path_index_);
+        }
+        else
+        {
+            nodes_ = ReadDirectoryTreeMulti("SELECTION", root_paths_, &root_node_id_to_path_index_);
+        }
 
         constexpr float shrink_factor = 0.97f;
 
@@ -315,17 +325,35 @@ public:
 
     std::string GetNodeFullPath(size_t in_node_id) const
     {
-        std::string path = nodes_[in_node_id].name;
+        std::string path;
         std::string buffer;
 
-        std::optional<size_t> node_id = nodes_[in_node_id].parent;
+        std::optional<size_t> node_id = in_node_id;
         while (node_id)
         {
             auto& node = nodes_[*node_id];
-            fmt::format_to(std::back_inserter(buffer), "{}/{}", node.name, path);
+            auto inserter = std::back_inserter(buffer);
+            const bool is_root = root_node_id_to_path_index_.contains(*node_id);
+
+            const auto format = fmt::runtime(path.empty() ? "{}" : "{}/{}");
+
+            if (is_root)
+            {
+                fmt::format_to(inserter, format, root_paths_[root_node_id_to_path_index_.at(*node_id)], path);
+            }
+            else
+            {
+                fmt::format_to(inserter, format, node.name, path);
+            }
+
             std::swap(path, buffer);
             buffer.clear();
-            node_id = node.parent;
+            node_id = is_root ? std::nullopt : node.parent;
+        }
+
+        for (char& c : path)
+        {
+            if (c == '\\') c = '/';
         }
 
         return path;
@@ -363,7 +391,6 @@ public:
 
             if (ImGui::Begin("Counter", nullptr, flags))
             {
-                ImGuiText("Root: {}", root_path_);
                 if (auto opt_node_id = FindNodeAt(GetMousePositionInWorldCoordinates()))
                 {
                     ImGuiText("Cursor: {}", GetNodeFullPath(*opt_node_id));
@@ -444,10 +471,12 @@ public:
     std::string text_buffer_;
 
     std::vector<TreeNode> nodes_;
+    std::unordered_map<size_t, size_t> root_node_id_to_path_index_;
+
     std::vector<Rect2d> rects_;
     std::vector<Vec4u8> colors_;
     std::unique_ptr<klgl::Painter2d> painter_;
-    fs::path root_path_;
+    std::vector<fs::path> root_paths_;
 
     float zoom_power_ = 0.f;
 
@@ -457,20 +486,24 @@ public:
     bool with_custom_viewport_ = false;
 };
 
-fs::path GetPath(int argc, char** argv)
+std::vector<fs::path> GetPaths(int argc, char** argv)
 {
-    if (argc < 2)
+    std::vector<fs::path> paths;
+    paths.reserve(argc - 1);
+
+    for (int i = 1; i != argc; ++i)
+    {
+        paths.emplace_back(argv[i]);  // NOLINT
+    }
+
+    if (paths.empty())
     {
 #ifdef _WIN32
-        std::vector<fs::path> paths = OpenFileDialog({.multiselect = false, .pick_folders = true});
-        klgl::ErrorHandling::Ensure(paths.size() == 1, "Expect 1 path selected but got {}", paths.size());
-        return paths.front();
-#else
-        throw klgl::ErrorHandling::RuntimeErrorWithMessage("Expected at least one path");
+        paths = OpenFileDialog({.multiselect = true, .pick_folders = true});
 #endif
     }
 
-    return fs::path(argv[1]);  // NOLINT
+    return paths;
 }
 
 }  // namespace rect_tree_viewer
@@ -480,7 +513,7 @@ int main(int argc, char** argv)
     klgl::ErrorHandling::InvokeAndCatchAll(
         [&]
         {
-            rect_tree_viewer::RectTreeViewerApp app(rect_tree_viewer::GetPath(argc, argv));
+            rect_tree_viewer::RectTreeViewerApp app(rect_tree_viewer::GetPaths(argc, argv));
             app.Run();
         });
 }
