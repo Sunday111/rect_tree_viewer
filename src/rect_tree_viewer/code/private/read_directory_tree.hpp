@@ -1,3 +1,5 @@
+#pragma once
+
 #include <filesystem>
 #include <ranges>
 #include <unordered_map>
@@ -10,7 +12,7 @@ struct ReadDirTreeEntry
     size_t id;
 };
 
-std::vector<TreeNode> ReadDirectoryTreeMulti(
+inline std::vector<TreeNode> ReadDirectoryTreeMulti(
     std::optional<std::string_view> root_node_name,
     std::span<const std::filesystem::path> paths,
     std::unordered_map<size_t, size_t>* out_root_node_id_to_path_index)
@@ -103,7 +105,7 @@ std::vector<TreeNode> ReadDirectoryTreeMulti(
     return nodes;
 }
 
-std::vector<TreeNode> ReadDirectoryTree(const std::filesystem::path& root_path)
+inline std::vector<TreeNode> ReadDirectoryTree(const std::filesystem::path& root_path)
 {
     return ReadDirectoryTreeMulti(std::nullopt, std::span{&root_path, 1}, nullptr);
 }
