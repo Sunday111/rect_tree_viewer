@@ -36,7 +36,7 @@ bool IsRelativeTo(const fs::path& path, const fs::path& parent_path)
 tl::expected<std::vector<fs::path>, std::string> ParseCLI(int argc, char** argv)
 {
     std::vector<fs::path> paths;
-    paths.reserve(argc - 1);
+    paths.reserve(static_cast<size_t>(argc) - 1);
 
     for (const int arg_index : std::views::iota(0, argc) | std::views::drop(1))
     {
