@@ -77,12 +77,7 @@ struct Rect2d
     }
 };
 
-struct Region
-{
-    Rect2d rect;
-    std::span<const size_t> nodes;
-    long double value = 0;
-};
+std::vector<Rect2d> MakeRectTreeRenderData(const std::span<const TreeNode> nodes, const float padding_factor = 0.97f);
 
 class RectTreeViewerApp : public klgl::Application
 {

@@ -8,9 +8,132 @@
 #include "klgl/opengl/gl_api.hpp"
 #include "read_directory_tree.hpp"
 
-
 namespace rect_tree_viewer
 {
+
+std::vector<Rect2d> MakeRectTreeRenderData(const std::span<const TreeNode> nodes, const float padding_factor)
+{
+    auto get_node_value = [&](size_t id)
+    {
+        return nodes[id].value;
+    };
+
+    std::vector<Rect2d> rects(nodes.size());
+    rects[0] = {.bottom_left = {-1, -1}, .size = {2, 2}};
+
+    struct Region
+    {
+        Rect2d rect;
+        std::span<const size_t> nodes;
+        long double value = 0;
+    };
+
+    auto split_rect = [](const Rect2d& rect, const long double split_ratio) -> std::tuple<Rect2d, Rect2d>
+    {
+        if (rect.size.x() > rect.size.y())
+        {
+            // split along X
+            // left rect
+            float left_width = static_cast<float>(static_cast<long double>(rect.size.x()) * split_ratio);
+            return std::make_tuple(
+                Rect2d{
+                    .bottom_left = rect.bottom_left,
+                    .size = {left_width, rect.size.y()},
+                },
+                // right rect
+                Rect2d{
+                    .bottom_left = {rect.bottom_left.x() + left_width, rect.bottom_left.y()},
+                    .size = {rect.size.x() - left_width, rect.size.y()},
+                });
+        }
+        else
+        {
+            // split along Y
+            // bottom rect
+            float bottom_height = static_cast<float>(static_cast<long double>(rect.size.y()) * split_ratio);
+            return std::make_tuple(
+                Rect2d{
+                    .bottom_left = rect.bottom_left,
+                    .size = {rect.size.x(), bottom_height},
+                },
+                // top rect
+                Rect2d{
+                    .bottom_left = {rect.bottom_left.x(), rect.bottom_left.y() + bottom_height},
+                    .size = {rect.size.x(), rect.size.y() - bottom_height},
+                });
+        }
+    };
+
+    std::vector<size_t> children_nodes;
+    std::vector<Region> regions;
+    for (const size_t node_id : std::views::iota(size_t{0}, nodes.size()))
+    {
+        children_nodes.clear();
+        regions.clear();
+        TreeHelper::GetChildren(nodes, node_id, children_nodes);
+
+        if (children_nodes.empty())
+        {
+            continue;
+        }
+
+        // sort children by value (=> area) in descending manner.
+        std::ranges::sort(children_nodes, std::greater{}, get_node_value);
+
+        {
+            const auto& orig_rect = rects[node_id];
+            const Vec2f rect_size = orig_rect.size * padding_factor;
+            regions.push_back(
+                {.rect = {.bottom_left = orig_rect.bottom_left + (orig_rect.size - rect_size) / 2, .size = rect_size},
+                 .nodes = children_nodes,
+                 .value = get_node_value(node_id)});
+        }
+
+        while (!regions.empty())
+        {
+            auto region_to_split = regions.back();
+            regions.pop_back();
+
+            if (region_to_split.nodes.size() == 1)
+            {
+                rects[region_to_split.nodes.front()] = region_to_split.rect;
+                continue;
+            }
+
+            size_t first_region_size = 1;
+            long double first_region_value = get_node_value(region_to_split.nodes.front());
+            while (first_region_value * 2.02L < region_to_split.value)
+            {
+                size_t child_id = region_to_split.nodes[first_region_size];
+                first_region_value += nodes[child_id].value;
+                first_region_size++;
+            }
+
+            const long double split_ratio = first_region_value / region_to_split.value;
+            auto [first_rect, second_rect] = split_rect(region_to_split.rect, split_ratio);
+
+            Region first_region{
+                .rect = first_rect,
+                .nodes = region_to_split.nodes.subspan(0, first_region_size),
+                .value = first_region_value,
+            };
+            assert(first_region.nodes.size() != 0);
+
+            Region second_region{
+                .rect = second_rect,
+                .nodes = region_to_split.nodes.subspan(first_region_size),
+                .value = region_to_split.value - first_region_value,
+            };
+            assert(second_region.nodes.size() != 0);
+
+            regions.push_back(first_region);
+            regions.push_back(second_region);
+        }
+    }
+
+    return rects;
+}
+
 void RectTreeViewerApp::Initialize()
 {
     event_listener_ = klgl::events::EventListenerMethodCallbacks<&RectTreeViewerApp::OnMouseScroll>::CreatePtr(this);
@@ -43,104 +166,7 @@ void RectTreeViewerApp::Initialize()
         nodes_ = ReadDirectoryTreeMulti("SELECTION", root_paths_, &root_node_id_to_path_index_);
     }
 
-    constexpr float shrink_factor = 0.97f;
-
-    rects_.resize(nodes_.size());
-    rects_[0] = {.bottom_left = {-1, -1}, .size = {2, 2}};
-
-    std::vector<size_t> children_nodes;
-    std::vector<Region> regions;
-    for (const size_t node_id : std::views::iota(size_t{0}, nodes_.size()))
-    {
-        children_nodes.clear();
-        regions.clear();
-        TreeHelper::GetChildren(nodes_, node_id, children_nodes);
-
-        if (children_nodes.empty())
-        {
-            continue;
-        }
-
-        // sort children by value (=> area) in descending manner.
-        std::ranges::sort(children_nodes, std::greater{}, [&](size_t id) { return nodes_[id].value; });
-
-        {
-            const auto& orig_rect = rects_[node_id];
-            Vec2f rect_size = orig_rect.size * shrink_factor;
-            regions.push_back(
-                {.rect = {.bottom_left = orig_rect.bottom_left + (orig_rect.size - rect_size) / 2, .size = rect_size},
-                 .nodes = children_nodes,
-                 .value = nodes_[node_id].value});
-        }
-
-        while (!regions.empty())
-        {
-            auto region_to_split = regions.back();
-            regions.pop_back();
-
-            if (region_to_split.nodes.size() == 1)
-            {
-                rects_[region_to_split.nodes.front()] = region_to_split.rect;
-                continue;
-            }
-
-            size_t first_region_size = 1;
-            long double first_region_value = nodes_[region_to_split.nodes.front()].value;
-            while (first_region_value * 2.02L < region_to_split.value)
-            {
-                size_t child_id = region_to_split.nodes[first_region_size];
-                first_region_value += nodes_[child_id].value;
-                first_region_size++;
-            }
-
-            Region first_region{};
-            first_region.nodes = region_to_split.nodes.subspan(0, first_region_size);
-            assert(first_region.nodes.size() != 0);
-            first_region.value = first_region_value;
-
-            Region second_region{};
-            second_region.nodes = region_to_split.nodes.subspan(first_region_size);
-            assert(second_region.nodes.size() != 0);
-            second_region.value = region_to_split.value - first_region_value;
-
-            const long double split_ratio = first_region_value / region_to_split.value;
-            if (region_to_split.rect.size.x() > region_to_split.rect.size.y())
-            {
-                // split along X
-                const auto& r = region_to_split.rect;
-                // left rect
-                float left_width = static_cast<float>(static_cast<long double>(r.size.x()) * split_ratio);
-                first_region.rect = {
-                    .bottom_left = r.bottom_left,
-                    .size = {left_width, r.size.y()},
-                };
-                // right rect
-                second_region.rect = {
-                    .bottom_left = {r.bottom_left.x() + left_width, r.bottom_left.y()},
-                    .size = {r.size.x() - left_width, r.size.y()},
-                };
-            }
-            else
-            {
-                // split along Y
-                const auto& r = region_to_split.rect;
-                // bottom rect
-                float bottom_height = static_cast<float>(static_cast<long double>(r.size.y()) * split_ratio);
-                first_region.rect = {
-                    .bottom_left = r.bottom_left,
-                    .size = {r.size.x(), bottom_height},
-                };
-                // top rect
-                second_region.rect = {
-                    .bottom_left = {r.bottom_left.x(), r.bottom_left.y() + bottom_height},
-                    .size = {r.size.x(), r.size.y() - bottom_height},
-                };
-            }
-
-            regions.push_back(first_region);
-            regions.push_back(second_region);
-        }
-    }
+    rects_ = MakeRectTreeRenderData(nodes_);
 
     colors_.resize(nodes_.size());
     unsigned kSeed = 0;
