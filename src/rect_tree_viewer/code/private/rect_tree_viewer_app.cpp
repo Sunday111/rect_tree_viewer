@@ -64,12 +64,17 @@ std::vector<Rect2d> MakeRectTreeRenderData(const std::span<const TreeNode> nodes
         }
     };
 
+    auto make_inner_rect = [&padding_factor](const Rect2d& rect) -> Rect2d
+    {
+        const Vec2f rect_size = rect.size * padding_factor;
+        return {.bottom_left = rect.bottom_left + (rect.size - rect_size) / 2, .size = rect_size};
+    };
+
     std::vector<size_t> children_nodes;
     std::vector<Region> regions;
     for (const size_t node_id : std::views::iota(size_t{0}, nodes.size()))
     {
         children_nodes.clear();
-        regions.clear();
         TreeHelper::GetChildren(nodes, node_id, children_nodes);
 
         if (children_nodes.empty())
@@ -77,18 +82,14 @@ std::vector<Rect2d> MakeRectTreeRenderData(const std::span<const TreeNode> nodes
             continue;
         }
 
-        // sort children by value (=> area) in descending manner.
+        // sort children by value in descending order
         std::ranges::sort(children_nodes, std::greater{}, get_node_value);
 
-        {
-            const auto& orig_rect = rects[node_id];
-            const Vec2f rect_size = orig_rect.size * padding_factor;
-            regions.push_back(
-                {.rect = {.bottom_left = orig_rect.bottom_left + (orig_rect.size - rect_size) / 2, .size = rect_size},
-                 .nodes = children_nodes,
-                 .value = get_node_value(node_id)});
-        }
+        // Make an inner rectangle for children
+        regions.push_back(
+            {.rect = make_inner_rect(rects[node_id]), .nodes = children_nodes, .value = get_node_value(node_id)});
 
+        // On each iteration: collect children to get 50+% of value and split the rect along the biggest extent
         while (!regions.empty())
         {
             auto region_to_split = regions.back();
@@ -100,6 +101,7 @@ std::vector<Rect2d> MakeRectTreeRenderData(const std::span<const TreeNode> nodes
                 continue;
             }
 
+            // Always send the first node to the first region
             size_t first_region_size = 1;
             long double first_region_value = get_node_value(region_to_split.nodes.front());
             while (first_region_value * 2.02L < region_to_split.value)
@@ -112,22 +114,19 @@ std::vector<Rect2d> MakeRectTreeRenderData(const std::span<const TreeNode> nodes
             const long double split_ratio = first_region_value / region_to_split.value;
             auto [first_rect, second_rect] = split_rect(region_to_split.rect, split_ratio);
 
-            Region first_region{
+            regions.push_back({
                 .rect = first_rect,
                 .nodes = region_to_split.nodes.subspan(0, first_region_size),
                 .value = first_region_value,
-            };
-            assert(first_region.nodes.size() != 0);
+            });
+            assert(!regions.back().nodes.empty());
 
-            Region second_region{
+            regions.push_back({
                 .rect = second_rect,
                 .nodes = region_to_split.nodes.subspan(first_region_size),
                 .value = region_to_split.value - first_region_value,
-            };
-            assert(second_region.nodes.size() != 0);
-
-            regions.push_back(first_region);
-            regions.push_back(second_region);
+            });
+            assert(!regions.back().nodes.empty());
         }
     }
 
