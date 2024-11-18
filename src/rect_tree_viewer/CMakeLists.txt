@@ -4,6 +4,8 @@ set(module_source_files
     ${CMAKE_CURRENT_SOURCE_DIR}/code/private/open_file_dialog.hpp
     ${CMAKE_CURRENT_SOURCE_DIR}/code/private/open_file_dialog_windows.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/code/private/read_directory_tree.hpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/code/private/rect_tree_draw_data.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/code/private/rect_tree_draw_data.hpp
     ${CMAKE_CURRENT_SOURCE_DIR}/code/private/rect_tree_viewer_app.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/code/private/rect_tree_viewer_app.hpp
     ${CMAKE_CURRENT_SOURCE_DIR}/code/private/rect_tree_viewer_main.cpp

@@ -18,7 +18,7 @@
 #include "klgl/rendering/painter2d.hpp"
 #include "klgl/window.hpp"
 #include "nlohmann/json.hpp"
-#include "tree.hpp"
+#include "rect_tree_draw_data.hpp"
 
 namespace rect_tree_viewer
 {
@@ -53,31 +53,6 @@ inline void WriteNodesGraphToJSON(std::span<const TreeNode> nodes, const fs::pat
 
     klgl::Filesystem::WriteFile(path, json.dump(2, ' '));
 }
-
-struct Rect2d
-{
-    Vec2f bottom_left{};
-    Vec2f size{};
-
-    [[nodiscard]] constexpr klgl::Painter2d::Rect2d ToPainterRect(edt::Vec4u8 color) const
-    {
-        return {
-            .center = bottom_left + size / 2,
-            .size = size,
-            .color = color,
-            .rotation_degrees = 0.f,
-        };
-    }
-
-    [[nodiscard]] constexpr bool Contains(const Vec2f& position) const
-    {
-        auto d = position - bottom_left;
-
-        return d.x() >= 0 && d.x() <= size.x() && d.y() >= 0 && d.y() <= size.y();
-    }
-};
-
-std::vector<Rect2d> MakeRectTreeRenderData(const std::span<const TreeNode> nodes, const float padding_factor = 0.97f);
 
 class RectTreeViewerApp : public klgl::Application
 {
