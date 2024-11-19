@@ -19,7 +19,7 @@ void RectTreeViewerApp::Initialize()
     klgl::Application::Initialize();
     klgl::OpenGl::SetClearColor({});
     GetWindow().SetSize(1000, 1000);
-    GetWindow().SetTitle("Painter 2d");
+    GetWindow().SetTitle("Rect Tree Viewer");
     SetTargetFramerate(60.f);
     painter_ = std::make_unique<klgl::Painter2d>();
 
