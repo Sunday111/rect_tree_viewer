@@ -3,6 +3,8 @@ include(set_compiler_options)
 set(module_source_files
     ${CMAKE_CURRENT_SOURCE_DIR}/code/private/open_file_dialog.hpp
     ${CMAKE_CURRENT_SOURCE_DIR}/code/private/open_file_dialog_windows.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/code/private/path_helpers.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/code/private/path_helpers.hpp
     ${CMAKE_CURRENT_SOURCE_DIR}/code/private/read_directory_tree.hpp
     ${CMAKE_CURRENT_SOURCE_DIR}/code/private/rect_tree_draw_data.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/code/private/rect_tree_draw_data.hpp

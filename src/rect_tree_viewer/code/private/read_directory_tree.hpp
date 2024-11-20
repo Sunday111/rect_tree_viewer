@@ -1,9 +1,12 @@
 #pragma once
 
+#include <fmt/std.h>
+
 #include <filesystem>
 #include <ranges>
 #include <unordered_map>
 
+#include "path_helpers.hpp"
 #include "tree.hpp"
 
 struct ReadDirTreeEntry
@@ -76,19 +79,42 @@ inline std::vector<TreeNode> ReadDirectoryTreeMulti(
             for (const auto& child_dir_entry : fs::directory_iterator(walk_entry.dir_entry))
             {
                 size_t child_id = nodes.size();
+                long double value = 0;
+                std::error_code err;
+                const bool is_file = fs::is_regular_file(child_dir_entry.path(), err);
+                if (is_file)
+                {
+                    value = static_cast<long double>(fs::file_size(child_dir_entry.path()));
+                }
+                else if (err)
+                {
+                    continue;
+                }
+                else
+                {
+                    try
+                    {
+                        fs::directory_iterator iterator(child_dir_entry.path());
+                    }
+                    catch (const std::exception&)
+                    {
+                        continue;
+                    };
+
+                    walk_stack.push_back({
+                        .dir_entry = child_dir_entry,
+                        .id = child_id,
+                    });
+                }
+
                 nodes.push_back({
-                    .name = child_dir_entry.path().stem().string(),
-                    .value = 0,
+                    .name = PathHelpers::PathToUTF8(child_dir_entry.path().stem()),
+                    .value = value,
                     .parent = walk_entry.id,
                     .next_sibling = nodes[walk_entry.id].first_child,
                 });
 
                 nodes[walk_entry.id].first_child = child_id;
-
-                walk_stack.push_back({
-                    .dir_entry = child_dir_entry,
-                    .id = child_id,
-                });
             }
         }
     }

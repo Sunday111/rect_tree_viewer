@@ -14,7 +14,7 @@ std::vector<Rect2d> RectTreeDrawData::Create(const std::span<const TreeNode> nod
         return nodes[id].value;
     };
 
-    // Make one rectangle for each node. Create root area covering the whole screen
+    // Make one rectangle for each node. Create root area covering the whole screen (maybe has to be a parameter)
     std::vector<Rect2d> rects(nodes.size());
     rects[0] = {.bottom_left = {-1, -1}, .size = {2, 2}};
 
