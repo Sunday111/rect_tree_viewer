@@ -1,7 +1,5 @@
 #include "path_helpers.hpp"
 
-#include <filesystem>
-
 #include "klgl/error_handling.hpp"
 
 #ifdef WIN32
@@ -48,7 +46,7 @@ std::string PathHelpers::StringToUTF8(const std::wstring_view& wstr)
 
 #else
 
-std::string PathHelpers::StringToUTF8(const std::wstring_view& wstr)
+std::string PathHelpers::StringToUTF8([[maybe_unused]] const std::wstring_view& wstr)
 {
     throw klgl::ErrorHandling::RuntimeErrorWithMessage("Not implemented");
 }

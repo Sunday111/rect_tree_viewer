@@ -1,12 +1,8 @@
 #pragma once
 
+#include <filesystem>
 #include <string>
 #include <string_view>
-
-namespace std::filesystem  // NOLINT
-{
-class path;
-}
 
 class PathHelpers
 {

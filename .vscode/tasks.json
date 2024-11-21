@@ -4,7 +4,7 @@
         {
             "label": "YAE: Generate",
             "type": "shell",
-            "command": "C:/data/soft/Python/3_12/python.exe",
+            "command": "/usr/bin/python3",
             "args": [
                 "${workspaceFolder}/yae/scripts/make_project_files.py",
                 "--project_dir=${workspaceFolder}",
@@ -24,7 +24,7 @@
         {
             "label": "YAE: Modules Git Status",
             "type": "shell",
-            "command": "C:/data/soft/Python/3_12/python.exe",
+            "command": "/usr/bin/python3",
             "args": [
                 "${workspaceFolder}/yae/scripts/modules_git_status.py",
                 "--project_dir=${workspaceFolder}",
