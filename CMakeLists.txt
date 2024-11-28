@@ -163,6 +163,9 @@ add_subdirectory(${YAE_klgl_simple_lit_cube_example_SOURCES} yae_modules/cloned_
 set(YAE_klgl_tests_SOURCES cloned_repositories/Sunday111/klgl/tests)
 add_subdirectory(${YAE_klgl_tests_SOURCES} yae_modules/cloned_repositories/Sunday111/klgl/tests SYSTEM)
 
+set(YAE_klgl_tetris_example_SOURCES cloned_repositories/Sunday111/klgl/examples/tetris)
+add_subdirectory(${YAE_klgl_tetris_example_SOURCES} yae_modules/cloned_repositories/Sunday111/klgl/examples/tetris SYSTEM)
+
 set(YAE_klgl_textured_quad_example_SOURCES cloned_repositories/Sunday111/klgl/examples/textured_quad)
 add_subdirectory(${YAE_klgl_textured_quad_example_SOURCES} yae_modules/cloned_repositories/Sunday111/klgl/examples/textured_quad SYSTEM)
 
