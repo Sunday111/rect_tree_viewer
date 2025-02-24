@@ -36,9 +36,17 @@ include(yae_lto)
 enable_lto_globally()
 
 
+# https://github.com/google/googletest v1.15.2
+set(YAE_gtest_SOURCES ${YAE_EXTERNAL_MODULES_DIR}/google/googletest/1_15_2)
+option(INSTALL_GTEST "" OFF)
+option(BUILD_GMOCK "" OFF)
+add_subdirectory(${YAE_gtest_SOURCES} yae_modules/google/googletest/1_15_2 SYSTEM)
+
 # https://github.com/Sunday111/EverydayTools master
 set(YAE_edt_SOURCES ${YAE_EXTERNAL_MODULES_DIR}/Sunday111/EverydayTools)
 option(EDT_WITH_TESTS "" ON)
+option(EDT_FETCH_GOOGLE_TESTS "" OFF)
+option(EDT_FIND_GTEST_PACKAGE "" OFF)
 add_subdirectory(${YAE_edt_SOURCES} yae_modules/Sunday111/EverydayTools SYSTEM)
 
 # https://github.com/Sunday111/CppReflection for_yae
@@ -49,9 +57,9 @@ add_subdirectory(${YAE_CppReflection_SOURCES} yae_modules/Sunday111/CppReflectio
 set(YAE_unordered_dense_SOURCES ${YAE_EXTERNAL_MODULES_DIR}/martinus/unordered_dense)
 add_subdirectory(${YAE_unordered_dense_SOURCES} yae_modules/martinus/unordered_dense SYSTEM)
 
-# https://github.com/fmtlib/fmt 10.1.1
-set(YAE_fmtlib_SOURCES ${YAE_EXTERNAL_MODULES_DIR}/fmt/10_1_1)
-add_subdirectory(${YAE_fmtlib_SOURCES} yae_modules/fmt/10_1_1 SYSTEM)
+# https://github.com/fmtlib/fmt 11.1.1
+set(YAE_fmtlib_SOURCES ${YAE_EXTERNAL_MODULES_DIR}/fmt/11_1_1)
+add_subdirectory(${YAE_fmtlib_SOURCES} yae_modules/fmt/11_1_1 SYSTEM)
 
 set(YAE_ecs_SOURCES yae/modules/examples/ecs)
 add_subdirectory(${YAE_ecs_SOURCES} yae_modules/yae/modules/examples/ecs SYSTEM)
@@ -63,12 +71,6 @@ add_subdirectory(${YAE_gbench_main_SOURCES} yae_modules/google/benchmark/1_8_3 S
 
 set(YAE_ecs_benchmark_SOURCES yae/modules/examples/ecs_benchmark)
 add_subdirectory(${YAE_ecs_benchmark_SOURCES} yae_modules/yae/modules/examples/ecs_benchmark SYSTEM)
-
-# https://github.com/google/googletest v1.15.2
-set(YAE_gtest_main_SOURCES ${YAE_EXTERNAL_MODULES_DIR}/google/googletest/1_15_2)
-option(INSTALL_GTEST "" OFF)
-option(BUILD_GMOCK "" OFF)
-add_subdirectory(${YAE_gtest_main_SOURCES} yae_modules/google/googletest/1_15_2 SYSTEM)
 
 set(YAE_ecs_tests_SOURCES yae/modules/examples/ecs_tests)
 add_subdirectory(${YAE_ecs_tests_SOURCES} yae_modules/yae/modules/examples/ecs_tests SYSTEM)
@@ -139,6 +141,9 @@ add_subdirectory(${YAE_klgl_SOURCES} yae_modules/cloned_repositories/Sunday111/k
 set(YAE_rect_tree_viewer_SOURCES src/rect_tree_viewer)
 add_subdirectory(${YAE_rect_tree_viewer_SOURCES} yae_modules/src/rect_tree_viewer SYSTEM)
 
+set(YAE_klgl_compute_shader_example_SOURCES cloned_repositories/Sunday111/klgl/examples/compute_shader)
+add_subdirectory(${YAE_klgl_compute_shader_example_SOURCES} yae_modules/cloned_repositories/Sunday111/klgl/examples/compute_shader SYSTEM)
+
 set(YAE_klgl_geometry_shader_SOURCES cloned_repositories/Sunday111/klgl/examples/geometry_shader)
 add_subdirectory(${YAE_klgl_geometry_shader_SOURCES} yae_modules/cloned_repositories/Sunday111/klgl/examples/geometry_shader SYSTEM)
 
@@ -154,6 +159,12 @@ add_subdirectory(${YAE_klgl_minimal_quad_example_SOURCES} yae_modules/cloned_rep
 set(YAE_klgl_painter2d_example_SOURCES cloned_repositories/Sunday111/klgl/examples/painter2d)
 add_subdirectory(${YAE_klgl_painter2d_example_SOURCES} yae_modules/cloned_repositories/Sunday111/klgl/examples/painter2d SYSTEM)
 
+set(YAE_klgl_post_processing_example_SOURCES cloned_repositories/Sunday111/klgl/examples/post_processing)
+add_subdirectory(${YAE_klgl_post_processing_example_SOURCES} yae_modules/cloned_repositories/Sunday111/klgl/examples/post_processing SYSTEM)
+
+set(YAE_klgl_render_to_texture_example_SOURCES cloned_repositories/Sunday111/klgl/examples/render_to_texture)
+add_subdirectory(${YAE_klgl_render_to_texture_example_SOURCES} yae_modules/cloned_repositories/Sunday111/klgl/examples/render_to_texture SYSTEM)
+
 set(YAE_klgl_rotator_benchmark_SOURCES cloned_repositories/Sunday111/klgl/benchmarks/rotators)
 add_subdirectory(${YAE_klgl_rotator_benchmark_SOURCES} yae_modules/cloned_repositories/Sunday111/klgl/benchmarks/rotators SYSTEM)
 
@@ -162,6 +173,9 @@ add_subdirectory(${YAE_klgl_simple_lit_cube_example_SOURCES} yae_modules/cloned_
 
 set(YAE_klgl_tests_SOURCES cloned_repositories/Sunday111/klgl/tests)
 add_subdirectory(${YAE_klgl_tests_SOURCES} yae_modules/cloned_repositories/Sunday111/klgl/tests SYSTEM)
+
+set(YAE_klgl_tetris_example_SOURCES cloned_repositories/Sunday111/klgl/examples/tetris)
+add_subdirectory(${YAE_klgl_tetris_example_SOURCES} yae_modules/cloned_repositories/Sunday111/klgl/examples/tetris SYSTEM)
 
 set(YAE_klgl_textured_quad_example_SOURCES cloned_repositories/Sunday111/klgl/examples/textured_quad)
 add_subdirectory(${YAE_klgl_textured_quad_example_SOURCES} yae_modules/cloned_repositories/Sunday111/klgl/examples/textured_quad SYSTEM)

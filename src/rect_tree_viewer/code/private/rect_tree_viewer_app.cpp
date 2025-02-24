@@ -221,7 +221,7 @@ void RectTreeViewerApp::Tick()
 
     for (const size_t i : std::views::iota(size_t{0}, nodes_.size()))
     {
-        painter_->DrawRect(rects_[i].ToPainterRect(colors_[i]));
+        painter_->FillRect(rects_[i].ToPainterRect(colors_[i]));
     }
 
     painter_->EndDraw();
