@@ -126,7 +126,7 @@ add_subdirectory(${YAE_imgui_glfw_cmake_SOURCES} yae_modules/cloned_repositories
 set(YAE_cpptrace_SOURCES ${YAE_EXTERNAL_MODULES_DIR}/jeremy-rifkin/cpptrace)
 add_subdirectory(${YAE_cpptrace_SOURCES} yae_modules/jeremy-rifkin/cpptrace SYSTEM)
 
-# https://github.com/Neargye/magic_enum v0.9.6
+# https://github.com/Neargye/magic_enum v0.9.7
 set(YAE_magic_enum_SOURCES ${YAE_EXTERNAL_MODULES_DIR}/Neargye/magic_enum)
 add_subdirectory(${YAE_magic_enum_SOURCES} yae_modules/Neargye/magic_enum SYSTEM)
 
