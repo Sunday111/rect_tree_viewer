@@ -64,10 +64,10 @@ add_subdirectory(${YAE_fmtlib_SOURCES} yae_modules/fmt/11_1_1 SYSTEM)
 set(YAE_ecs_SOURCES yae/modules/examples/ecs)
 add_subdirectory(${YAE_ecs_SOURCES} yae_modules/yae/modules/examples/ecs SYSTEM)
 
-# https://github.com/google/benchmark v1.8.3
-set(YAE_gbench_main_SOURCES ${YAE_EXTERNAL_MODULES_DIR}/google/benchmark/1_8_3)
+# https://github.com/google/benchmark v1.9.4
+set(YAE_gbench_main_SOURCES ${YAE_EXTERNAL_MODULES_DIR}/google/benchmark/1_9_4)
 option(BENCHMARK_ENABLE_TESTING "" OFF)
-add_subdirectory(${YAE_gbench_main_SOURCES} yae_modules/google/benchmark/1_8_3 SYSTEM)
+add_subdirectory(${YAE_gbench_main_SOURCES} yae_modules/google/benchmark/1_9_4 SYSTEM)
 
 set(YAE_ecs_benchmark_SOURCES yae/modules/examples/ecs_benchmark)
 add_subdirectory(${YAE_ecs_benchmark_SOURCES} yae_modules/yae/modules/examples/ecs_benchmark SYSTEM)
