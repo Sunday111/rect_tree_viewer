@@ -126,7 +126,7 @@ add_subdirectory(${YAE_imgui_glfw_cmake_SOURCES} yae_modules/cloned_repositories
 set(YAE_cpptrace_SOURCES ${YAE_EXTERNAL_MODULES_DIR}/jeremy-rifkin/cpptrace)
 add_subdirectory(${YAE_cpptrace_SOURCES} yae_modules/jeremy-rifkin/cpptrace SYSTEM)
 
-# https://github.com/Neargye/magic_enum v0.9.6
+# https://github.com/Neargye/magic_enum v0.9.7
 set(YAE_magic_enum_SOURCES ${YAE_EXTERNAL_MODULES_DIR}/Neargye/magic_enum)
 add_subdirectory(${YAE_magic_enum_SOURCES} yae_modules/Neargye/magic_enum SYSTEM)
 
@@ -143,6 +143,9 @@ add_subdirectory(${YAE_rect_tree_viewer_SOURCES} yae_modules/src/rect_tree_viewe
 
 set(YAE_klgl_compute_shader_example_SOURCES cloned_repositories/Sunday111/klgl/examples/compute_shader)
 add_subdirectory(${YAE_klgl_compute_shader_example_SOURCES} yae_modules/cloned_repositories/Sunday111/klgl/examples/compute_shader SYSTEM)
+
+set(YAE_klgl_fractal_example_SOURCES cloned_repositories/Sunday111/klgl/examples/fractal)
+add_subdirectory(${YAE_klgl_fractal_example_SOURCES} yae_modules/cloned_repositories/Sunday111/klgl/examples/fractal SYSTEM)
 
 set(YAE_klgl_geometry_shader_SOURCES cloned_repositories/Sunday111/klgl/examples/geometry_shader)
 add_subdirectory(${YAE_klgl_geometry_shader_SOURCES} yae_modules/cloned_repositories/Sunday111/klgl/examples/geometry_shader SYSTEM)
