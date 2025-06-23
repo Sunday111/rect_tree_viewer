@@ -70,8 +70,8 @@ void RectTreeViewerApp::OnMouseScroll(const klgl::events::OnMouseScroll& event)
 
 void RectTreeViewerApp::UpdateCamera()
 {
-    if (!with_custom_viewport_) viewport_.MatchWindowSize(GetWindow().GetSize2f());
-    viewport_.UseInOpenGL();
+    if (!with_custom_viewport_) viewport_.MatchWindowSize(GetWindow().GetSize());
+    klgl::OpenGl::SetViewport(viewport_);
 
     transforms_.Update(camera_, viewport_, kAspectRatioPolicy);
 
