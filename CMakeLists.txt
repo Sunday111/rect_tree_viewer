@@ -144,6 +144,9 @@ add_subdirectory(${YAE_rect_tree_viewer_SOURCES} yae_modules/src/rect_tree_viewe
 set(YAE_klgl_compute_shader_example_SOURCES cloned_repositories/Sunday111/klgl/examples/compute_shader)
 add_subdirectory(${YAE_klgl_compute_shader_example_SOURCES} yae_modules/cloned_repositories/Sunday111/klgl/examples/compute_shader SYSTEM)
 
+set(YAE_klgl_curve_example_SOURCES cloned_repositories/Sunday111/klgl/examples/curve)
+add_subdirectory(${YAE_klgl_curve_example_SOURCES} yae_modules/cloned_repositories/Sunday111/klgl/examples/curve SYSTEM)
+
 set(YAE_klgl_fractal_example_SOURCES cloned_repositories/Sunday111/klgl/examples/fractal)
 add_subdirectory(${YAE_klgl_fractal_example_SOURCES} yae_modules/cloned_repositories/Sunday111/klgl/examples/fractal SYSTEM)
 
