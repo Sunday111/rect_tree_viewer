@@ -67,7 +67,7 @@ std::vector<std::filesystem::path> OpenFileDialog(const OpenFileDialogParams& pa
 
         const auto item_release = klgl::OnScopeLeave([&] { item->Release(); });
 
-        PWSTR file_path = NULL;
+        PWSTR file_path = nullptr;
         klgl::ErrorHandling::Ensure(
             SUCCEEDED(item->GetDisplayName(SIGDN_FILESYSPATH, &file_path)),
             "failed to get display name of item {}",
